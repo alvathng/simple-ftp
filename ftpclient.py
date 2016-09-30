@@ -5,7 +5,6 @@
 #		STOR <file_name>, copy file to current remote directory 
 # 	RETR <file_name>, retrieve file from current remote directory
 # additional commands
-#		QUIT, quit FTP client
 #		PWD, get current remote directory
 #		CDUP, change to parent remote directory
 #		CWD <path>, change current remote directory
