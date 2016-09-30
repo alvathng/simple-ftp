@@ -6,8 +6,9 @@
 # 	RETR <file_name>, retrieve file from current remote directory
 # additional commands
 #		QUIT, quit FTP client
-#		CWD <path>, change current remote directory
+#		PWD, get current remote directory
 #		CDUP, change to parent remote directory
+#		CWD <path>, change current remote directory
 #		MKD, make a directory in remote server
 #		RMD <dir_name>, remove a directory in remote server
 #		DELE <file_name>, delete a file in remote server 
@@ -25,7 +26,7 @@ class FTPclient:
 		self.port = int(port)
 		self.data_port = int(data_port)
 
-	def createConnection(self):
+	def create_connection(self):
 	  print 'Starting connection to', self.address, ':', self.port
 
 	  try:
@@ -33,7 +34,7 @@ class FTPclient:
 	  	self.sock.connect(server_address)
 	  	print 'Connected to', self.address, ':', self.port
 	  except KeyboardInterrupt:
-	  	self.commandQuit()
+	  	self.command_quit()
 	  except:
 	  	print 'Connection to', self.address, ':', self.port, 'failed'
 	  	print 'FTP client terminating...'
@@ -42,37 +43,35 @@ class FTPclient:
 
 	def start(self):
 		try:
-			self.createConnection()
+			self.create_connection()
 			while True:
 				raw = raw_input('Enter command: ')
 				arguments = raw.split(' ')
 
 				command = arguments[0].upper()
 				if (command == 'QUIT'):
-					self.commandQuit()
+					self.command_quit()
 				elif (command == 'STOR'):
-					self.commandStor(arguments[1])
+					self.command_stor(arguments[1])
 				elif (command == 'RETR'):
-					print 'hahaha'
-					self.sock.send('lalala')
-					self.commandRetr(arguments[1])
+					self.command_retr(arguments[1])
 				else:
-					print 'Command invalid'
-		except socket.timeout:
-			self.commandQuit()
-		except KeyboardInterrupt:
-			self.commandQuit()
+					self.sock.send(raw)
+					data = self.sock.recv(1024)
+					print data
+		except:
+			self.command_quit()
 
-	def commandStor(self, file_name):
+	def command_stor(self, file_name):
 		# TODO implement stor, to copy file from client to server
 		print 'Storing', file_name, 'to the server'
 
-	def commandRetr(self, file_name):
+	def command_retr(self, file_name):
 		# TODO implement retr, to retrieve file from server to client
 		print 'Retrieving', file_name, 'from the server'
 
 	# stop FTP client, close the connection and exit the program
-	def commandQuit(self):
+	def command_quit(self):
 		print 'Closing socket connection...'
 		self.sock.close()
 
@@ -81,7 +80,7 @@ class FTPclient:
 
 # TODO change this using command line arguments argv[]
 address = 'localhost'
-port = 10022
+port = 10021
 data_port = 10020
 ftpClient = FTPclient(address, port, data_port)
 ftpClient.start()
