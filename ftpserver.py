@@ -17,7 +17,7 @@
 import socket
 import os
 import sys
-import threading
+import threading # TODO try to use multi-threading...
 import multiprocessing
 
 class FTPserver:
@@ -46,8 +46,8 @@ class FTPserver:
 
 			print 'FTP server terminating...'
 			quit()
-		except:
-			print 'Failed to create server on', self.address, ':', self.port, 'because'
+		except Exception, e:
+			print 'Failed to create server on', self.address, ':', self.port, 'because' str(e.strerror)
 			quit()
 
 	def run_command(self, command, arguments):
@@ -72,6 +72,10 @@ class FTPserver:
 			os.chdir('..')
 			self.cwd = os.getcwd()
 			return self.cwd
+			# TODO command for STOR & RETR 
+			# 	open new socket for data connection
+			#   read data from client then write to a file
+			# 	read the file (for RETR) then send it to the client
 		else:
 		  return 'Invalid command'
 

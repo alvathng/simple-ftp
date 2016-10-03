@@ -56,6 +56,7 @@ class FTPclient:
 					self.command_retr(arguments[1])
 				else:
 					self.sock.send(raw)
+					# TODO research, what 1024 really means
 					data = self.sock.recv(1024)
 					print data
 		except:
