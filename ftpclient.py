@@ -78,7 +78,6 @@ class FTPclient:
 		print 'FTP client terminating...'
 		quit()
 
-# TODO change this using command line arguments argv[]
 address = raw_input("Destination address - if left empty, default address is localhost: ")
 
 if not address:
