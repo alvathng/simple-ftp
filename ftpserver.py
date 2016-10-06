@@ -82,7 +82,7 @@ class FTPserver:
 				self.cwd = os.getcwd()
 				return self.cwd
 			else:
-				return 'Missing argument: <path>'
+				return 'Missing argument: <dir_name>'
 			return self.cwd
 		elif (command == 'RMD'):
 			if (len(arguments) >= 1):
@@ -94,9 +94,9 @@ class FTPserver:
 				self.cwd = os.getcwd()
 				return self.cwd
 			else:
-				return 'Missing argument: <path>'
+				return 'Missing argument: <dir_name>'
 			return self.cwd
-		elif (command == 'RMD'):
+		elif (command == 'DELE'):
 			if (len(arguments) >= 1):
 				try:
 					os.remove(arguments[0])
@@ -106,7 +106,7 @@ class FTPserver:
 				self.cwd = os.getcwd()
 				return self.cwd
 			else:
-				return 'Missing argument: <path>'
+				return 'Missing argument: <file_name>'
 			return self.cwd
         	
 			# TODO command for STOR & RETR 
@@ -154,9 +154,8 @@ class FTPserver:
 			self.sock.close()
 			quit()
 
+port = raw_input("Port: ")
+data_port = raw_input("Data port: ")
 
-# TODO change this using command line arguments argv[]
-port = 10021
-data_port = 10020
 server = FTPserver(port, data_port)
 server.start()

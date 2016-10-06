@@ -79,8 +79,9 @@ class FTPclient:
 		quit()
 
 # TODO change this using command line arguments argv[]
-address = 'localhost'
-port = 10021
-data_port = 10020
+address = raw_input("Destination address: ")
+port = raw_input("Port: ")
+data_port = raw_input("Data port: ")
+
 ftpClient = FTPclient(address, port, data_port)
 ftpClient.start()

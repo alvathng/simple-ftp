@@ -22,12 +22,15 @@ implemented in python, using multiprocessing to handle multi-user connection
 - [x] PWD, get current remote directory
 - [x] CDUP, change to parent remote directory
 - [x] CWD <path>, change current remote directory
+- [x] MKD <dir_name>, make a directory in remote server
+- [x] RMD <dir_name>, remove a directory in remote server
+- [x] DELE <file_name>, delete a file in remote server 
 - [ ] other commands... see [list of FTP commands](https://en.wikipedia.org/wiki/List_of_FTP_commands)
 
 ### **Milestones**
 - [x] Socket
 - [x] Multiprocessing
-- [ ] Read from arguments for server address &amp; ports
+- [x] Read from arguments for server address &amp; ports
 - [ ] other...
 
 ### **Contributing**
