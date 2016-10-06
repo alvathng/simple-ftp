@@ -154,8 +154,15 @@ class FTPserver:
 			self.sock.close()
 			quit()
 
-port = raw_input("Port: ")
-data_port = raw_input("Data port: ")
+port = raw_input("Port - if left empty, default port is 10021: ")
+
+if not port:
+	port = 10021
+
+data_port = raw_input("Data port - if left empty, default port is 10020: ")
+
+if not data_port:
+	data_port = 10020
 
 server = FTPserver(port, data_port)
 server.start()
