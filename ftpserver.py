@@ -47,7 +47,7 @@ class FTPserver:
 			print 'FTP server terminating...'
 			quit()
 		except Exception, e:
-			print 'Failed to create server on', self.address, ':', self.port, 'because' str(e.strerror)
+			print 'Failed to create server on', self.address, ':', self.port, 'because', str(e.strerror)
 			quit()
 
 	def run_command(self, command, arguments):
@@ -72,6 +72,43 @@ class FTPserver:
 			os.chdir('..')
 			self.cwd = os.getcwd()
 			return self.cwd
+		elif (command == 'MKD'):
+			if (len(arguments) >= 1):
+				try:
+					os.mkdir(arguments[0])
+				except Exception, e:
+					return ('Error: ' + str(e.strerror))
+
+				self.cwd = os.getcwd()
+				return self.cwd
+			else:
+				return 'Missing argument: <path>'
+			return self.cwd
+		elif (command == 'RMD'):
+			if (len(arguments) >= 1):
+				try:
+					os.rmdir(arguments[0])
+				except Exception, e:
+					return ('Error: ' + str(e.strerror))
+
+				self.cwd = os.getcwd()
+				return self.cwd
+			else:
+				return 'Missing argument: <path>'
+			return self.cwd
+		elif (command == 'RMD'):
+			if (len(arguments) >= 1):
+				try:
+					os.remove(arguments[0])
+				except Exception, e:
+					return ('Error: ' + str(e.strerror))
+
+				self.cwd = os.getcwd()
+				return self.cwd
+			else:
+				return 'Missing argument: <path>'
+			return self.cwd
+        	
 			# TODO command for STOR & RETR 
 			# 	open new socket for data connection
 			#   read data from client then write to a file
