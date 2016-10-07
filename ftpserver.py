@@ -66,9 +66,6 @@ class FTPserver:
 
 			print 'FTP server terminating...'
 			quit()
-		except Exception, e:
-			print 'Failed to create server on', self.address, ':', self.port, 'because', str(e.strerror)
-			quit()
 
 	def run_command(self, command, arguments):
 		if (command == 'LIST'):
@@ -93,10 +90,17 @@ class FTPserver:
 			self.cwd = os.getcwd()
 			return self.cwd
 		elif (command == 'STOR'):
-			self.client.send('150 Opening data connection.\r\n')
-			self.open_datasock()
 
 			path = os.path.join(self.cwd, arguments[0])
+			self.client.send('150 Opening data connection.\r\n')
+
+			try:
+				self.open_datasock()
+				self.client.send('125 Data connection already open; transfer starting.')
+			except:
+				print 'test'
+				self.client.send('425 Can\'t open data connection.\r\n')
+
 			file_write = open(path, 'wb')
 			(client_data, data_addr) = self.datasock.accept()
 			print 'Data from', data_addr
@@ -109,6 +113,33 @@ class FTPserver:
 			file_write.close()
 			self.datasock.close()
 			return '226 Transfer complete.\r\n'
+
+		elif (command == 'RETR'):
+			path = os.path.join(self.cwd, arguments[0])
+			self.client.send('150 Opening data connection.\r\n')
+
+			file_read= open(path, "r")
+
+			data = file_read.read(1024)
+
+			try:
+				self.open_datasock()
+				self.client.send('125 Data connection already open; transfer starting.')
+			except Exception, e:
+				print e
+				self.client.send('425 Can\'t open data connection.\r\n')
+			
+			(client_data, data_addr) = self.datasock.accept()
+
+			while data:
+				print data
+				client_data.send(data)
+				data = file_read.read(1024)
+
+			file_read.close()
+			self.datasock.close()
+			return '226 Transfer complete.\r\n'
+
 		elif (command == 'MKD'):
 			if (len(arguments) >= 1):
 				try:

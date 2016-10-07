@@ -18,9 +18,7 @@ import sys
 
 class FTPclient:
 	def __init__(self, address, port, data_port):
-		# create TCP socket
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 		self.address = address
 		self.port = int(port)
 		self.data_port = int(data_port)
@@ -53,10 +51,9 @@ class FTPclient:
 				elif (command == 'STOR'):
 					self.command_stor(raw, arguments[1])
 				elif (command == 'RETR'):
-					self.command_retr(arguments[1])
+					self.command_retr(raw, arguments[1])
 				else:
 					self.sock.send(raw)
-					# TODO research, what 1024 really means
 					data = self.sock.recv(1024)
 					print data
 		except Exception, e:
@@ -64,26 +61,57 @@ class FTPclient:
 
 	def command_stor(self, raw, path):
 		f = open(path, 'r')
-		# TODO implement stor, to copy file from client to server
 		print 'Storing', path, 'to the server'
 		self.sock.send(raw)
 		data = self.sock.recv(1024)
 		if (data):
 			print data
-			self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			self.datasock.connect((self.address, self.data_port))
-			upload = f.read(1024)
-			while upload:
-				print 'isi', upload
-				self.datasock.send(upload)
+
+			try:
+				self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				self.datasock.connect((self.address, self.data_port))
 				upload = f.read(1024)
-			f.close()
-			self.datasock.close()
+				while upload:
+					self.datasock.send(upload)
+					upload = f.read(1024)
+				f.close()
+				self.datasock.close()
+			except:
+				pass
+			finally:
+				data = self.sock.recv(1024)
+				print data
+				f.close()
+				self.datasock.close()
 
+	def command_retr(self, raw, path):
+		print 'Retrieving', path, 'from the server'
+		f = open(path,'w')
+		self.sock.send(raw)
 
-	def command_retr(self, file_name):
-		# TODO implement retr, to retrieve file from server to client
-		print 'Retrieving', file_name, 'from the server'
+		data = self.sock.recv(1024)
+
+		if (data):
+			print data
+
+			try: 
+				self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				self.datasock.connect((self.address, self.data_port))
+
+				while True:
+					download = self.datasock.recv(1024)
+					if not download: break
+					f.write(download)
+				f.close()
+				self.datasock.close()
+			except Exception, e:
+				print e
+				pass
+			finally:
+				data = self.sock.recv(1024)
+				print data
+				f.close()
+				self.datasock.close()
 
 	# stop FTP client, close the connection and exit the program
 	def command_quit(self):
