@@ -17,37 +17,14 @@
 import socket
 import os
 import sys
-import threading # TODO try to use multi-threading...
-import multiprocessing
+import threading
 
-class FTPserver:
-	def __init__(self, port, data_port):
-		# server address at localhost
-		self.address = '127.0.0.1'
-
-		self.port = int(port)
-		self.data_port = int(data_port)
-
-	def open_sock(self):
-		# create TCP socket
-		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		server_address = (self.address, self.port)
-
-		try:
-			print 'Creating data socket on', self.address, ':', self.port, '...'
-			self.sock.bind(server_address)
-			self.sock.listen(1)
-			print 'Server is up. Listening to', self.address, ':', self.port
-		except KeyboardInterrupt:
-			print 'Closing socket connection...'
-			self.sock.close()
-
-			print 'FTP server terminating...'
-			quit()
-		except Exception, e:
-			print 'Failed to create server on', self.address, ':', self.port, 'because', str(e.strerror)
-			quit()
+class FTPThreadServer(threading.Thread):
+	def __init__(self, (client, client_address)):
+		self.client = client
+		self.client_address = client_address
+		self.cwd = os.getcwd()
+		threading.Thread.__init__(self)
 
 	def open_datasock(self):
 		# create TCP socket
@@ -174,23 +151,17 @@ class FTPserver:
 				return 'Missing argument: <file_name>'
 			return self.cwd
         	
-			# TODO command for STOR & RETR 
-			# 	open new socket for data connection
-			#   read data from client then write to a file
-			# 	read the file (for RETR) then send it to the client
 		else:
 		  return 'Invalid command'
 
-	def handle_client(self, client, client_address):
-		try:
-			print 'client connected: ', client_address
-			self.cwd = os.getcwd()
-			self.client = client
+	def run(self):
+		try :
+			print 'client connected: ', self.client_address
 
 			while True:
-				raw = client.recv(1024)
+				raw = self.client.recv(1024)
 				if raw:
-					print 'commands from', client_address, ':', raw
+					print 'commands from', self.client_address, ':', raw
 					split = raw.split(' ')
 					command = split[0].upper()
 					arguments = split[1:]
@@ -202,9 +173,38 @@ class FTPserver:
 					break
 		except Exception, e:
 			print str(e)
-			print 'Closing connection from', client_address, '...'
-			client.close()
+			print 'Closing connection from', self.client_address, '...'
+			self.client.close()
 			sys.exit(1)
+
+class FTPserver:
+	def __init__(self, port, data_port):
+		# server address at localhost
+		self.address = '127.0.0.1'
+
+		self.port = int(port)
+		self.data_port = int(data_port)
+
+	def open_sock(self):
+		# create TCP socket
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		server_address = (self.address, self.port)
+
+		try:
+			print 'Creating data socket on', self.address, ':', self.port, '...'
+			self.sock.bind(server_address)
+			self.sock.listen(1)
+			print 'Server is up. Listening to', self.address, ':', self.port
+		except KeyboardInterrupt:
+			print 'Closing socket connection...'
+			self.sock.close()
+
+			print 'FTP server terminating...'
+			quit()
+		except Exception, e:
+			print 'Failed to create server on', self.address, ':', self.port, 'because', str(e.strerror)
+			quit()
 
 	def start(self):
 		self.open_sock()
@@ -212,11 +212,9 @@ class FTPserver:
 		try:
 			while True:
 				print 'Waiting for a connection'
-				client, client_address = self.sock.accept()
-				
-				process = multiprocessing.Process(target = self.handle_client, args = (client, client_address))
-				process.daemon = True
-				process.start()
+				thread = FTPThreadServer(self.sock.accept())
+				thread.daemon = True
+				thread.start()
 		except KeyboardInterrupt:
 			print 'Closing socket connection'
 			self.sock.close()
