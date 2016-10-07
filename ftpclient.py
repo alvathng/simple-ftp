@@ -51,7 +51,7 @@ class FTPclient:
 				if (command == 'QUIT'):
 					self.command_quit()
 				elif (command == 'STOR'):
-					self.command_stor(arguments[1])
+					self.command_stor(raw, arguments[1])
 				elif (command == 'RETR'):
 					self.command_retr(arguments[1])
 				else:
@@ -59,12 +59,27 @@ class FTPclient:
 					# TODO research, what 1024 really means
 					data = self.sock.recv(1024)
 					print data
-		except:
-			self.command_quit()
+		except Exception, e:
+			print str(e)
 
-	def command_stor(self, file_name):
+	def command_stor(self, raw, path):
+		f = open(path, 'r')
 		# TODO implement stor, to copy file from client to server
-		print 'Storing', file_name, 'to the server'
+		print 'Storing', path, 'to the server'
+		self.sock.send(raw)
+		data = self.sock.recv(1024)
+		if (data):
+			print data
+			self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			self.datasock.connect((self.address, self.data_port))
+			upload = f.read(1024)
+			while upload:
+				print 'isi', upload
+				self.datasock.send(upload)
+				upload = f.read(1024)
+			f.close()
+			self.datasock.close()
+
 
 	def command_retr(self, file_name):
 		# TODO implement retr, to retrieve file from server to client

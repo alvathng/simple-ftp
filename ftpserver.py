@@ -22,27 +22,47 @@ import multiprocessing
 
 class FTPserver:
 	def __init__(self, port, data_port):
-		# create TCP socket
-		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 		# server address at localhost
 		self.address = '127.0.0.1'
 
 		self.port = int(port)
 		self.data_port = int(data_port)
 
-	def open_connection(self):
+	def open_sock(self):
+		# create TCP socket
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		server_address = (self.address, self.port)
 
 		try:
-			print 'Creating server on', self.address, ':', self.port, '...'
+			print 'Creating data socket on', self.address, ':', self.port, '...'
 			self.sock.bind(server_address)
 			self.sock.listen(1)
 			print 'Server is up. Listening to', self.address, ':', self.port
 		except KeyboardInterrupt:
 			print 'Closing socket connection...'
 			self.sock.close()
+
+			print 'FTP server terminating...'
+			quit()
+		except Exception, e:
+			print 'Failed to create server on', self.address, ':', self.port, 'because', str(e.strerror)
+			quit()
+
+	def open_datasock(self):
+		# create TCP socket
+		self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.datasock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		data_address = (self.address, self.data_port)
+
+		try:
+			print 'Creating data socket on', self.address, ':', self.data_port, '...'
+			self.datasock.bind(data_address)
+			self.datasock.listen(1)
+			print 'Server is up. Listening to', self.address, ':', self.data_port
+		except KeyboardInterrupt:
+			print 'Closing socket connection...'
+			self.datasock.close()
 
 			print 'FTP server terminating...'
 			quit()
@@ -72,6 +92,23 @@ class FTPserver:
 			os.chdir('..')
 			self.cwd = os.getcwd()
 			return self.cwd
+		elif (command == 'STOR'):
+			self.client.send('150 Opening data connection.\r\n')
+			self.open_datasock()
+
+			path = os.path.join(self.cwd, arguments[0])
+			file_write = open(path, 'wb')
+			(client_data, data_addr) = self.datasock.accept()
+			print 'Data from', data_addr
+			while True:
+				data = client_data.recv(1024)
+				if not data:
+					break
+				file_write.write(data)
+
+			file_write.close()
+			self.datasock.close()
+			return '226 Transfer complete.\r\n'
 		elif (command == 'MKD'):
 			if (len(arguments) >= 1):
 				try:
@@ -120,6 +157,7 @@ class FTPserver:
 		try:
 			print 'client connected: ', client_address
 			self.cwd = os.getcwd()
+			self.client = client
 
 			while True:
 				raw = client.recv(1024)
@@ -130,16 +168,18 @@ class FTPserver:
 					arguments = split[1:]
 
 					result = self.run_command(command, arguments)
-					client.send(result)
+					print result
+					self.client.send(result)
 				else:
 					break
-		except:
+		except Exception, e:
+			print str(e)
 			print 'Closing connection from', client_address, '...'
 			client.close()
 			sys.exit(1)
 
 	def start(self):
-		self.open_connection()
+		self.open_sock()
 
 		try:
 			while True:
