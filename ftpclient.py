@@ -105,7 +105,7 @@ class FTPclient:
 				f.close()
 				self.datasock.close()
 			except Exception, e:
-				print e
+				print '452 Error writing file.\r\n'
 				pass
 			finally:
 				data = self.sock.recv(1024)

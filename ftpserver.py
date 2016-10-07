@@ -98,7 +98,6 @@ class FTPserver:
 				self.open_datasock()
 				self.client.send('125 Data connection already open; transfer starting.')
 			except:
-				print 'test'
 				self.client.send('425 Can\'t open data connection.\r\n')
 
 			file_write = open(path, 'wb')
@@ -126,13 +125,11 @@ class FTPserver:
 				self.open_datasock()
 				self.client.send('125 Data connection already open; transfer starting.')
 			except Exception, e:
-				print e
 				self.client.send('425 Can\'t open data connection.\r\n')
 			
 			(client_data, data_addr) = self.datasock.accept()
 
 			while data:
-				print data
 				client_data.send(data)
 				data = file_read.read(1024)
 
@@ -148,7 +145,7 @@ class FTPserver:
 					return ('Error: ' + str(e.strerror))
 
 				self.cwd = os.getcwd()
-				return self.cwd
+				return '257 Directory created.\r\n'
 			else:
 				return 'Missing argument: <dir_name>'
 			return self.cwd
@@ -160,7 +157,7 @@ class FTPserver:
 					return ('Error: ' + str(e.strerror))
 
 				self.cwd = os.getcwd()
-				return self.cwd
+				return '250 Directory deleted.\r\n'
 			else:
 				return 'Missing argument: <dir_name>'
 			return self.cwd
@@ -172,7 +169,7 @@ class FTPserver:
 					return ('Error: ' + str(e.strerror))
 
 				self.cwd = os.getcwd()
-				return self.cwd
+				return '250 File deleted.\r\n'
 			else:
 				return 'Missing argument: <file_name>'
 			return self.cwd
