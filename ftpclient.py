@@ -94,8 +94,20 @@ class FTPclient:
 		quit()
 
 # TODO change this using command line arguments argv[]
-address = 'localhost'
-port = 10021
-data_port = 10020
+address = raw_input("Destination address - if left empty, default address is localhost: ")
+
+if not address:
+	address = 'localhost'
+
+port = raw_input("Port - if left empty, default port is 10021: ")
+
+if not port:
+	port = 10021
+
+data_port = raw_input("Data port - if left empty, default port is 10020: ")
+
+if not data_port:
+	data_port = 10020
+
 ftpClient = FTPclient(address, port, data_port)
 ftpClient.start()

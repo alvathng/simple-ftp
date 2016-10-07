@@ -109,6 +109,47 @@ class FTPserver:
 			file_write.close()
 			self.datasock.close()
 			return '226 Transfer complete.\r\n'
+		elif (command == 'MKD'):
+			if (len(arguments) >= 1):
+				try:
+					os.mkdir(arguments[0])
+				except Exception, e:
+					return ('Error: ' + str(e.strerror))
+
+				self.cwd = os.getcwd()
+				return self.cwd
+			else:
+				return 'Missing argument: <dir_name>'
+			return self.cwd
+		elif (command == 'RMD'):
+			if (len(arguments) >= 1):
+				try:
+					os.rmdir(arguments[0])
+				except Exception, e:
+					return ('Error: ' + str(e.strerror))
+
+				self.cwd = os.getcwd()
+				return self.cwd
+			else:
+				return 'Missing argument: <dir_name>'
+			return self.cwd
+		elif (command == 'DELE'):
+			if (len(arguments) >= 1):
+				try:
+					os.remove(arguments[0])
+				except Exception, e:
+					return ('Error: ' + str(e.strerror))
+
+				self.cwd = os.getcwd()
+				return self.cwd
+			else:
+				return 'Missing argument: <file_name>'
+			return self.cwd
+        	
+			# TODO command for STOR & RETR 
+			# 	open new socket for data connection
+			#   read data from client then write to a file
+			# 	read the file (for RETR) then send it to the client
 		else:
 		  return 'Invalid command'
 
@@ -153,9 +194,15 @@ class FTPserver:
 			self.sock.close()
 			quit()
 
+port = raw_input("Port - if left empty, default port is 10021: ")
 
-# TODO change this using command line arguments argv[]
-port = 10021
-data_port = 10020
+if not port:
+	port = 10021
+
+data_port = raw_input("Data port - if left empty, default port is 10020: ")
+
+if not data_port:
+	data_port = 10020
+
 server = FTPserver(port, data_port)
 server.start()
