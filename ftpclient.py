@@ -31,90 +31,85 @@ class FTPclient:
 	  	self.sock.connect(server_address)
 	  	print 'Connected to', self.address, ':', self.port
 	  except KeyboardInterrupt:
-	  	self.command_quit()
+	  	self.close_client()
 	  except:
 	  	print 'Connection to', self.address, ':', self.port, 'failed'
-	  	print 'FTP client terminating...'
-	  	quit()
-
+	  	self.close_client()
 
 	def start(self):
 		try:
 			self.create_connection()
 			while True:
-				raw = raw_input('Enter command: ')
-				arguments = raw.split(' ')
+				command = raw_input('Enter command: ')
+				cmd  = command[:4].strip().upper()
+				path = command[4:].strip()
 
-				command = arguments[0].upper()
-				if (command == 'QUIT'):
-					self.command_quit()
-				elif (command == 'STOR'):
-					self.command_stor(raw, arguments[1])
-				elif (command == 'RETR'):
-					self.command_retr(raw, arguments[1])
-				else:
-					self.sock.send(raw)
-					data = self.sock.recv(1024)
-					print data
+				self.sock.send(command)
+				data = self.sock.recv(1024)
+
+				print data
+				if (cmd == 'QUIT'):
+					self.close_client()
+				elif (cmd == 'LIST' or cmd == 'STOR' or cmd == 'RETR'):
+					if (data and (data[0:3] == '125')):
+						func = getattr(self, cmd)
+						func(path)
+						data = self.sock.recv(1024)
+						print data
 		except Exception, e:
-			print str(e)
+			print e
+			self.close_client()
 
-	def command_stor(self, raw, path):
-		f = open(path, 'r')
+	def connect_datasock(self):
+		self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.datasock.connect((self.address, self.data_port))
+
+	def LIST(self, path):
+		try:
+			self.connect_datasock()
+
+			while True:
+				dirlist = self.datasock.recv(1024)
+				if not dirlist: break
+				sys.stdout.write(dirlist)
+				sys.stdout.flush()
+		except:
+			pass
+		finally:
+			self.datasock.close()
+
+	def STOR(self, path):
 		print 'Storing', path, 'to the server'
-		self.sock.send(raw)
-		data = self.sock.recv(1024)
-		if (data):
-			print data
-
-			try:
-				self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-				self.datasock.connect((self.address, self.data_port))
+		try:
+			self.connect_datasock()
+		
+			f = open(path, 'r')
+			upload = f.read(1024)
+			while upload:
+				self.datasock.send(upload)
 				upload = f.read(1024)
-				while upload:
-					self.datasock.send(upload)
-					upload = f.read(1024)
-				f.close()
-				self.datasock.close()
-			except:
-				pass
-			finally:
-				data = self.sock.recv(1024)
-				print data
-				f.close()
-				self.datasock.close()
+		except:
+			pass
+		finally:
+			f.close()
+			self.datasock.close()
 
-	def command_retr(self, raw, path):
+	def RETR(self, path):
 		print 'Retrieving', path, 'from the server'
-		f = open(path,'w')
-		self.sock.send(raw)
+		try: 
+			self.connect_datasock()
 
-		data = self.sock.recv(1024)
-
-		if (data):
-			print data
-
-			try: 
-				self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-				self.datasock.connect((self.address, self.data_port))
-
-				while True:
-					download = self.datasock.recv(1024)
-					if not download: break
-					f.write(download)
-				f.close()
-				self.datasock.close()
-			except Exception, e:
-				print '452 Error writing file.\r\n'
-				pass
-			finally:
-				data = self.sock.recv(1024)
-				print data
-				f.close()
-				self.datasock.close()
+			f = open(path,'w')
+			while True:
+				download = self.datasock.recv(1024)
+				if not download: break
+				f.write(download)
+		finally:
+			f.close()
+			self.datasock.close()
 
 	# stop FTP client, close the connection and exit the program
-	def command_quit(self):
+	def close_client(self):
 		print 'Closing socket connection...'
 		self.sock.close()
 
