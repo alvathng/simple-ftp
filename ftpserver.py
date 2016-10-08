@@ -19,67 +19,141 @@ import os
 import sys
 import threading
 
+basecwd = os.getcwd()
+
 class FTPThreadServer(threading.Thread):
-	def __init__(self, (client, client_address)):
+	def __init__(self, (client, client_address), local_ip, data_port):
 		self.client = client
 		self.client_address = client_address
-		self.cwd = os.getcwd()
+		self.cwd = basecwd
+		self.data_address = (local_ip, data_port)
 		threading.Thread.__init__(self)
 
-	def open_datasock(self):
+	def start_datasock(self):
 		# create TCP socket
 		self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.datasock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		data_address = (self.address, self.data_port)
 
 		try:
-			print 'Creating data socket on', self.address, ':', self.data_port, '...'
-			self.datasock.bind(data_address)
+			self.client.send('150 Opening data transfer.\r\n')
+			print 'Creating data socket on' + str(self.data_address) + '...'
+			
+			self.datasock.bind(self.data_address)
 			self.datasock.listen(1)
-			print 'Server is up. Listening to', self.address, ':', self.data_port
-		except KeyboardInterrupt:
-			print 'Closing socket connection...'
-			self.datasock.close()
+			
+			print 'Data socket is started. Listening to' + str(self.data_address) + '...'
+			self.client.send('125 Data connection already open; transfer starting.\r\n')
 
-			print 'FTP server terminating...'
+			return self.datasock.accept()
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			print 'Closing socket connection...'
+			self.close_datasock()
+			self.client.send('425 Cannot open data connection.\r\n')
+			
+	def close_datasock(self):
+		self.datasock.close()
+
+	def run(self):
+		try :
+			print 'client connected: ' + str(self.client_address) + '\n'
+
+			while True:
+				cmd = self.client.recv(1024)
+				if not cmd: break
+				print 'commands from ' + str(self.client_address) + ': ' + cmd
+				try:
+					func = getattr(self, cmd[:4].strip().upper())
+					func(cmd)
+				except AttributeError, e:
+					print str(e)
+					print 'ERROR: ' + str(self.client_address) + ': Invalid Command.'
+					self.client.send('550 Invalid Command\r\n')
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+
+			print 'Closing connection from ' + str(self.client_address) + '...'
+			self.client.close()
 			quit()
 
-	def run_command(self, command, arguments):
-		if (command == 'LIST'):
-			ls = os.listdir(self.cwd)
-			return '\n'.join(ls)
-		elif (command == 'PWD'):
-			return self.cwd
-		elif (command == 'CWD'):
-			if (len(arguments) >= 1):
-				try:
-					os.chdir(arguments[0])
-				except Exception, e:
-					return ('Error: ' + str(e.strerror))
+	def LIST(self, cmd):
+		print 'LIST', self.cwd		
+		self.start_datasock()
+		try:
+			for i in os.listdir(self.cwd):
+				print i
+				self.datasock.send(i + '\r\n')
+			self.close_datasock()
+			self.client.send('226 Directory send OK.\r\n')
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			self.close_datasock()
+			self.client.send('426 Connection closed; transfer aborted.\r\n')
 
-				self.cwd = os.getcwd()
-				return self.cwd
+	def PWD(self, cmd):
+		self.client.send('257 \"%s\".\r\n' % self.cwd)
+
+	def CWD(self, cmd):
+		dest = os.path.join(self.cwd, cmd[4:].strip())
+		if (os.path.isdir(dest)):
+			self.cwd = dest
+			self.client.send('250 OK \"%s\".\r\n' % self.cwd)
+		else:
+			print 'ERROR: ' + str(self.client_address) + ': No such file or directory.'
+			self.client.send('550 \"' + dest + '\": No such file or directory.\r\n')
+
+	def CDUP(self, cmd):
+		dest = os.path.abspath(os.path.join(self.cwd, '..'))
+		if (os.path.isdir(dest)):
+			self.cwd = dest
+			self.client.send('250 OK \"%s\".\r\n' % self.cwd)
+		else:
+			print 'ERROR: ' + str(self.client_address) + ': No such file or directory.'
+			self.client.send('550 \"' + dest + '\": No such file or directory.\r\n')
+
+
+	def MKD(self, cmd):
+		dirname = os.path.join(self.cwd, cmd[4:].strip())
+		try:
+			if not dirname:
+				self.client.send('501 Missing arguments <dirname>.\r\n')
 			else:
-				return 'Missing argument: <path>'
-			return self.cwd
-		elif (command == 'CDUP'):
-			os.chdir('..')
-			self.cwd = os.getcwd()
-			return self.cwd
-		elif (command == 'STOR'):
+				os.mkdir(dirname)
+				self.client.send('250 Directory created: ' + dirname + '.\r\n')
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			self.client.send('550 Failed to create directory ' + dirname + '.')
 
-			path = os.path.join(self.cwd, arguments[0])
-			self.client.send('150 Opening data connection.\r\n')
+	def RMD(self, cmd):
+		dirname = os.path.join(self.cwd, cmd[4:].strip())
+		try:
+			if not dirname:
+				self.client.send('501 Missing arguments <dirname>.\r\n')
+			else:
+				os.rmdir(dirname)
+				self.client.send('250 Directory deleted: ' + dirname + '.\r\n')
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			self.client.send('550 Failed to delete directory ' + dirname + '.')
 
-			try:
-				self.open_datasock()
-				self.client.send('125 Data connection already open; transfer starting.')
-			except:
-				self.client.send('425 Can\'t open data connection.\r\n')
+	def DELE(self, cmd):
+		filename = os.path.join(self.cwd, cmd[4:].strip())
+		try:
+			if not filename:
+				self.client.send('501 Missing arguments <filename>.\r\n')
+			else:
+				os.remove(filename)
+				self.client.send('250 File deleted: ' + filename + '.\r\n')
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			self.client.send('550 Failed to delete file ' + filename + '.')
 
-			file_write = open(path, 'wb')
-			(client_data, data_addr) = self.datasock.accept()
-			print 'Data from', data_addr
+	def STOR(self, cmd):
+		path = os.path.join(self.cwd, cmd[4:].strip())
+		(client_data, client_address) = self.start_datasock()
+		
+		try:
+			file_write = open(path, 'w')
 			while True:
 				data = client_data.recv(1024)
 				if not data:
@@ -88,23 +162,19 @@ class FTPThreadServer(threading.Thread):
 
 			file_write.close()
 			self.datasock.close()
-			return '226 Transfer complete.\r\n'
+			self.client.send('226 Transfer complete.\r\n')
+		except Exception, e:
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			self.close_datasock()
+			self.client.send('426 Connection closed; transfer aborted.\r\n')
 
-		elif (command == 'RETR'):
-			path = os.path.join(self.cwd, arguments[0])
-			self.client.send('150 Opening data connection.\r\n')
-
-			file_read= open(path, "r")
-
+	def RETR(self, cmd):
+		path = os.path.join(self.cwd, cmd[4:].strip())
+		(client_data, client_address) = self.start_datasock()
+		
+		try:
+			file_read = open(path, "r")
 			data = file_read.read(1024)
-
-			try:
-				self.open_datasock()
-				self.client.send('125 Data connection already open; transfer starting.')
-			except Exception, e:
-				self.client.send('425 Can\'t open data connection.\r\n')
-			
-			(client_data, data_addr) = self.datasock.accept()
 
 			while data:
 				client_data.send(data)
@@ -112,70 +182,12 @@ class FTPThreadServer(threading.Thread):
 
 			file_read.close()
 			self.datasock.close()
-			return '226 Transfer complete.\r\n'
-
-		elif (command == 'MKD'):
-			if (len(arguments) >= 1):
-				try:
-					os.mkdir(arguments[0])
-				except Exception, e:
-					return ('Error: ' + str(e.strerror))
-
-				self.cwd = os.getcwd()
-				return '257 Directory created.\r\n'
-			else:
-				return 'Missing argument: <dir_name>'
-			return self.cwd
-		elif (command == 'RMD'):
-			if (len(arguments) >= 1):
-				try:
-					os.rmdir(arguments[0])
-				except Exception, e:
-					return ('Error: ' + str(e.strerror))
-
-				self.cwd = os.getcwd()
-				return '250 Directory deleted.\r\n'
-			else:
-				return 'Missing argument: <dir_name>'
-			return self.cwd
-		elif (command == 'DELE'):
-			if (len(arguments) >= 1):
-				try:
-					os.remove(arguments[0])
-				except Exception, e:
-					return ('Error: ' + str(e.strerror))
-
-				self.cwd = os.getcwd()
-				return '250 File deleted.\r\n'
-			else:
-				return 'Missing argument: <file_name>'
-			return self.cwd
-        	
-		else:
-		  return 'Invalid command'
-
-	def run(self):
-		try :
-			print 'client connected: ', self.client_address
-
-			while True:
-				raw = self.client.recv(1024)
-				if raw:
-					print 'commands from', self.client_address, ':', raw
-					split = raw.split(' ')
-					command = split[0].upper()
-					arguments = split[1:]
-
-					result = self.run_command(command, arguments)
-					print result
-					self.client.send(result)
-				else:
-					break
+			self.client.send('226 Transfer complete.\r\n')
 		except Exception, e:
-			print str(e)
-			print 'Closing connection from', self.client_address, '...'
-			self.client.close()
-			sys.exit(1)
+			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
+			self.close_datasock()
+			self.client.send('426 Connection closed; transfer aborted.\r\n')
+
 
 class FTPserver:
 	def __init__(self, port, data_port):
@@ -185,7 +197,7 @@ class FTPserver:
 		self.port = int(port)
 		self.data_port = int(data_port)
 
-	def open_sock(self):
+	def start_sock(self):
 		# create TCP socket
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -207,12 +219,12 @@ class FTPserver:
 			quit()
 
 	def start(self):
-		self.open_sock()
+		self.start_sock()
 
 		try:
 			while True:
 				print 'Waiting for a connection'
-				thread = FTPThreadServer(self.sock.accept())
+				thread = FTPThreadServer(self.sock.accept(), self.address, self.data_port)
 				thread.daemon = True
 				thread.start()
 		except KeyboardInterrupt:
@@ -220,13 +232,13 @@ class FTPserver:
 			self.sock.close()
 			quit()
 
-port = raw_input("Port - if left empty, default port is 10021: ")
 
+# Main
+port = raw_input("Port - if left empty, default port is 10021: ")
 if not port:
 	port = 10021
 
 data_port = raw_input("Data port - if left empty, default port is 10020: ")
-
 if not data_port:
 	data_port = 10020
 
