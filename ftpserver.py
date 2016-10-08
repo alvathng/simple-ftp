@@ -20,27 +20,25 @@ import sys
 import threading
 import time
 
-basecwd = os.getcwd()
-
 class FTPThreadServer(threading.Thread):
 	def __init__(self, (client, client_address), local_ip, data_port):
 		self.client = client
 		self.client_address = client_address
-		self.cwd = basecwd
+		self.cwd = os.getcwd()
 		self.data_address = (local_ip, data_port)
+
 		threading.Thread.__init__(self)
 
 	def start_datasock(self):
-		# create TCP socket
-
 		try:
 			print 'Creating data socket on' + str(self.data_address) + '...'
 			
+			# create TCP for data socket
 			self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			self.datasock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 			self.datasock.bind(self.data_address)
-			self.datasock.listen(1)
+			self.datasock.listen(5)
 			
 			print 'Data socket is started. Listening to' + str(self.data_address) + '...'
 			self.client.send('125 Data connection already open; transfer starting.\r\n')
@@ -52,8 +50,11 @@ class FTPThreadServer(threading.Thread):
 			self.client.send('425 Cannot open data connection.\r\n')
 			
 	def close_datasock(self):
-		print 'Closing socket connection...'
-		self.datasock.close()
+		print 'Closing data socket connection...'
+		try:
+			self.datasock.close()
+		except:
+			pass
 
 	def run(self):
 		try :
@@ -74,19 +75,26 @@ class FTPThreadServer(threading.Thread):
 			self.QUIT('')
 
 	def QUIT(self, cmd):
-		self.client.send('221 Goodbye.\r\n')
-		print 'Closing connection from ' + str(self.client_address) + '...'
-		self.close_datasock()
-		self.client.close()
-		quit()
+		try:
+			self.client.send('221 Goodbye.\r\n')
+		except:
+			pass
+		finally:
+			print 'Closing connection from ' + str(self.client_address) + '...'
+			self.close_datasock()
+			self.client.close()
+			quit()
 
 	def LIST(self, cmd):
-		print 'LIST', self.cwd	
+		print 'LIST', self.cwd
 		(client_data, client_address) = self.start_datasock()
 
 		try:
 			listdir = os.listdir(self.cwd)
-			max_length = len(max(listdir, key=len))
+			if not len(listdir):
+				max_length = 0
+			else:
+				max_length = len(max(listdir, key=len))
 
 			header = '| %*s | %9s | %12s | %20s | %11s | %12s |' % (max_length, 'Name', 'Filetype', 'Filesize', 'Last Modified', 'Permission', 'User/Group')
 			table = '%s\n%s\n%s\n' % ('-' * len(header), header, '-' * len(header))
@@ -97,10 +105,11 @@ class FTPThreadServer(threading.Thread):
 				stat = os.stat(path)
 				data = '| %*s | %9s | %12s | %20s | %11s | %12s |\n' % (max_length, i, 'Directory' if os.path.isdir(path) else 'File', str(stat.st_size) + 'B', time.strftime('%b %d, %Y %H:%M', time.localtime(stat.st_mtime))
 					, oct(stat.st_mode)[-4:], str(stat.st_uid) + '/' + str(stat.st_gid)) 
-				print data
 				client_data.send(data)
+			
 			table = '%s\n' % ('-' * len(header))
 			client_data.send(table)
+			
 			self.client.send('\r\n226 Directory send OK.\r\n')
 		except Exception, e:
 			print 'ERROR: ' + str(self.client_address) + ': ' + str(e)
@@ -132,9 +141,10 @@ class FTPThreadServer(threading.Thread):
 
 
 	def MKD(self, cmd):
-		dirname = os.path.join(self.cwd, cmd[4:].strip())
+		path = cmd[4:].strip()
+		dirname = os.path.join(self.cwd, path)
 		try:
-			if not dirname:
+			if not path:
 				self.client.send('501 Missing arguments <dirname>.\r\n')
 			else:
 				os.mkdir(dirname)
@@ -144,9 +154,10 @@ class FTPThreadServer(threading.Thread):
 			self.client.send('550 Failed to create directory ' + dirname + '.')
 
 	def RMD(self, cmd):
-		dirname = os.path.join(self.cwd, cmd[4:].strip())
+		path = cmd[4:].strip()
+		dirname = os.path.join(self.cwd, path)
 		try:
-			if not dirname:
+			if not path:
 				self.client.send('501 Missing arguments <dirname>.\r\n')
 			else:
 				os.rmdir(dirname)
@@ -156,9 +167,10 @@ class FTPThreadServer(threading.Thread):
 			self.client.send('550 Failed to delete directory ' + dirname + '.')
 
 	def DELE(self, cmd):
-		filename = os.path.join(self.cwd, cmd[4:].strip())
+		path = cmd[4:].strip()
+		filename = os.path.join(self.cwd, path)
 		try:
-			if not filename:
+			if not path:
 				self.client.send('501 Missing arguments <filename>.\r\n')
 			else:
 				os.remove(filename)
@@ -168,11 +180,16 @@ class FTPThreadServer(threading.Thread):
 			self.client.send('550 Failed to delete file ' + filename + '.')
 
 	def STOR(self, cmd):
-		path = os.path.join(self.cwd, cmd[4:].strip())
+		path = cmd[4:].strip()
+		if not path:
+			self.client.send('501 Missing arguments <filename>.\r\n')
+			return
+
+		fname = os.path.join(self.cwd, path)
 		(client_data, client_address) = self.start_datasock()
 		
 		try:
-			file_write = open(path, 'w')
+			file_write = open(fname, 'w')
 			while True:
 				data = client_data.recv(1024)
 				if not data:
@@ -189,13 +206,18 @@ class FTPThreadServer(threading.Thread):
 			file_write.close()
 
 	def RETR(self, cmd):
-		path = os.path.join(self.cwd, cmd[4:].strip())
+		path = cmd[4:].strip()
+		if not path:
+			self.client.send('501 Missing arguments <filename>.\r\n')
+			return
+
+		fname = os.path.join(self.cwd, path)
 		(client_data, client_address) = self.start_datasock()
-		if not os.path.isfile(path):
+		if not os.path.isfile(fname):
 			self.client.send('550 File not found.\r\n')
 		else:
 			try:
-				file_read = open(path, "r")
+				file_read = open(fname, "r")
 				data = file_read.read(1024)
 
 				while data:
@@ -214,7 +236,7 @@ class FTPThreadServer(threading.Thread):
 class FTPserver:
 	def __init__(self, port, data_port):
 		# server address at localhost
-		self.address = '127.0.0.1'
+		self.address = '0.0.0.0'
 
 		self.port = int(port)
 		self.data_port = int(data_port)
@@ -228,7 +250,7 @@ class FTPserver:
 		try:
 			print 'Creating data socket on', self.address, ':', self.port, '...'
 			self.sock.bind(server_address)
-			self.sock.listen(1)
+			self.sock.listen(5)
 			print 'Server is up. Listening to', self.address, ':', self.port
 		except Exception, e:
 			print 'Failed to create server on', self.address, ':', self.port, 'because', str(e.strerror)

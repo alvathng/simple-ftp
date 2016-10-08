@@ -39,15 +39,26 @@ class FTPclient:
 	def start(self):
 		try:
 			self.create_connection()
-			while True:
-				command = raw_input('Enter command: ')
-				cmd  = command[:4].strip().upper()
-				path = command[4:].strip()
+		except Exception, e:
+			self.close_client()
 
+		while True:
+			try:
+				command = raw_input('Enter command: ')
+				if not command: 
+					print 'Need a command.'
+					continue
+			except KeyboardInterrupt:
+				self.close_client()
+
+			cmd  = command[:4].strip().upper()
+			path = command[4:].strip()
+
+			try:
 				self.sock.send(command)
 				data = self.sock.recv(1024)
-
 				print data
+
 				if (cmd == 'QUIT'):
 					self.close_client()
 				elif (cmd == 'LIST' or cmd == 'STOR' or cmd == 'RETR'):
@@ -56,9 +67,9 @@ class FTPclient:
 						func(path)
 						data = self.sock.recv(1024)
 						print data
-		except Exception, e:
-			print e
-			self.close_client()
+			except Exception, e:
+				print str(e)
+				self.close_client()
 
 	def connect_datasock(self):
 		self.datasock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -73,8 +84,8 @@ class FTPclient:
 				if not dirlist: break
 				sys.stdout.write(dirlist)
 				sys.stdout.flush()
-		except:
-			pass
+		except Exception, e:
+			print str(e)
 		finally:
 			self.datasock.close()
 
@@ -88,8 +99,8 @@ class FTPclient:
 			while upload:
 				self.datasock.send(upload)
 				upload = f.read(1024)
-		except:
-			pass
+		except Exception, e:
+			print str(e)
 		finally:
 			f.close()
 			self.datasock.close()
@@ -104,6 +115,8 @@ class FTPclient:
 				download = self.datasock.recv(1024)
 				if not download: break
 				f.write(download)
+		except Exception, e:
+			print str(e)
 		finally:
 			f.close()
 			self.datasock.close()
